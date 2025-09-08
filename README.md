@@ -23,6 +23,4 @@ Built with **Bootstrap 5, OpenLayers, and DataTables** for a responsive and inte
 - [DataTables](https://datatables.net/) – Interactive layer table
 - [jQuery](https://jquery.com/) – DOM handling
 
----
 
-## 📂 Project Structure
