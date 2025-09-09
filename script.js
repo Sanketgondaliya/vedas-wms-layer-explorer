@@ -92,8 +92,9 @@
         document.getElementById('loading').style.display = 'block';
         // Clear previous results
         document.getElementById('layersTableBody').innerHTML = '';
+        const proxyUrl = "http://127.0.0.1:8000/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
 
-        fetch(capabilitiesUrl)
+        fetch(proxyUrl)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Server returned ${response.status}: ${response.statusText}`);
