@@ -92,7 +92,7 @@
         document.getElementById('loading').style.display = 'block';
         // Clear previous results
         document.getElementById('layersTableBody').innerHTML = '';
-        const proxyUrl = "https://vedas-wms-layer-explorer-1.onrender.com/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
+        const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
 
         fetch(proxyUrl)
             .then(response => {
