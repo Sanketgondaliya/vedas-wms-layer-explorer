@@ -16,10 +16,21 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-5">
-                <div class="card">
-                    <div class="card-header">
-                        <i class="bi bi-server"></i> WMS Server Selection
+            <!-- Left Panel Toggle Button (Mobile Only) -->
+            <div class="d-lg-none mobile-toggle-container">
+                <button class="btn btn-primary mobile-toggle-btn" id="leftPanelToggle">
+                    <i class="bi bi-layers"></i>
+                </button>
+            </div>
+
+            <!-- Left Panel -->
+            <div class="col-lg-5 col-xl-4 left-panel" id="leftPanel">
+                <div class="card server-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-server"></i> WMS Server Selection</span>
+                        <button class="btn btn-sm btn-outline-light d-lg-none" id="closeLeftPanel">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
                     </div>
                     <div class="card-body">
                         <div class="server-select">
@@ -43,7 +54,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card layers-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <span><i class="bi bi-layer-forward"></i> Available Layers</span>
                         <span class="badge bg-primary" id="layerCount">0</span>
@@ -60,22 +71,35 @@
                                 <thead class="table-light sticky-top">
                                     <tr>
                                         <th>Title</th>
+                                        <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="layersTableBody">
                                     <tr>
-                                        <td colspan="2" class="text-center py-4">No layers loaded yet</td>
+                                        <td colspan="3" class="text-center py-4">No layers loaded yet</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
+
+                <div class="card layers-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-info-square"></i> Layer Legend</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="legend p-3" id="legend">
+                            <p class="text-muted text-center mb-0">No active layer selected</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="col-md-7">
-                <div class="card">
+            <!-- Right Panel -->
+            <div class="col-lg-7 col-xl-8 right-panel">
+                <div class="card map-card">
                     <div class="card-header">
                         <i class="bi bi-map"></i> Map View
                     </div>
@@ -116,37 +140,12 @@
                         <div class="ol-popup-content" id="popup-content"></div>
                     </div>
                 </div>
-
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-list-check"></i> Active Layers</span>
-                                <span class="badge bg-success" id="activeLayerCount">0</span>
-                            </div>
-                            <div class="card-body p-0">
-                                <ul class="list-group list-group-flush" id="activeLayersList">
-                                    <li class="list-group-item text-center py-4">No active layers</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-info-square"></i> Layer Legend</span>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="legend p-3" id="legend">
-                                    <p class="text-muted text-center mb-0">No active layer selected</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
+
+    <!-- Overlay for mobile when left panel is open -->
+    <div class="overlay" id="overlay"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
