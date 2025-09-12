@@ -426,75 +426,86 @@
     }
 
     // Feature info on map click
-    map.on('singleclick', function (evt) {
-        const view = map.getView();
-        const viewResolution = view.getResolution();
+// Feature info on map click
+map.on('singleclick', function (evt) {
+    const view = map.getView();
+    const viewResolution = view.getResolution();
+    const size = map.getSize();
+    const projection = view.getProjection();
+    
+    // Get the map extent (bounding box)
+    const extent = view.calculateExtent(size);
+    
+    // Check all active WMS layers for feature info
+    const featureInfoPromises = activeLayers.map(layer => {
+        if (!layer.getVisible()) return Promise.resolve(null);
 
-        // Check all active WMS layers for feature info
-        const featureInfoPromises = activeLayers.map(layer => {
-            if (!layer.getVisible()) return Promise.resolve(null);
+        const source = layer.getSource();
+        if (!source || !(source instanceof ol.source.TileWMS)) return Promise.resolve(null);
+        
+        // Calculate pixel coordinates for the click
+        const coordinate = evt.coordinate;
+        const pixel = map.getPixelFromCoordinate(coordinate);
+        
+        // Build the proxy URL
+        const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getfeatureinfo?" +
+            `url=${encodeURIComponent(currentServerUrl)}` +
+            `&bbox=${extent.join(',')}` +
+            `&width=${size[0]}` +
+            `&height=${size[1]}` +
+            `&x=${Math.round(pixel[0])}` +
+            `&y=${Math.round(pixel[1])}` +
+            `&layers=${layer.get('name')}` +
+            `&crs=${projection.getCode()}`;
 
-            const source = layer.getSource();
-            if (!source || !(source instanceof ol.source.TileWMS)) return Promise.resolve(null);
-
-            const url = source.getFeatureInfoUrl(
-                evt.coordinate,
-                viewResolution,
-                view.getProjection(),
-                { 'INFO_FORMAT': 'application/json' }
-            );
-
-            if (!url) return Promise.resolve(null);
-
-            return fetch(url)
-                .then(response => response.json())
-                .then(json => {
-                    if (json.features && json.features.length > 0) {
-                        return {
-                            layer: layer.get('title'),
-                            features: json.features
-                        };
-                    }
-                    return null;
-                })
-                .catch(error => {
-                    console.error('Error fetching feature info:', error);
-                    return null;
-                });
-        });
-
-        // Process all promises
-        Promise.all(featureInfoPromises).then(results => {
-            const validResults = results.filter(result => result !== null);
-
-            if (validResults.length === 0) {
-                document.getElementById('featureInfo').innerHTML = '<p class="text-muted text-center mb-0">No feature information found at this location</p>';
-                return;
-            }
-
-            let featureInfoHtml = '';
-            validResults.forEach(result => {
-                featureInfoHtml += `<h6>${result.layer}</h6>`;
-
-                result.features.forEach((feature, index) => {
-                    featureInfoHtml += `<div class="mb-3"><strong>Feature ${index + 1}:</strong><table class="table table-sm table-bordered">`;
-
-                    for (const key in feature.properties) {
-                        if (feature.properties.hasOwnProperty(key)) {
-                            featureInfoHtml += `<tr><td>${key}</td><td>${feature.properties[key]}</td></tr>`;
-                        }
-                    }
-
-                    featureInfoHtml += '</table></div>';
-                });
+        return fetch(proxyUrl)
+            .then(response => response.json())
+            .then(json => {
+                if (json.features && json.features.length > 0) {
+                    return {
+                        layer: layer.get('title'),
+                        features: json.features
+                    };
+                }
+                return null;
+            })
+            .catch(error => {
+                console.error('Error fetching feature info:', error);
+                return null;
             });
-
-            if (featureInfoHtml) {
-                content.innerHTML = featureInfoHtml;
-                overlay.setPosition(evt.coordinate);
-            } else {
-                overlay.setPosition(undefined);
-            }
-
-        });
     });
+
+    // Process all promises
+    Promise.all(featureInfoPromises).then(results => {
+        const validResults = results.filter(result => result !== null);
+
+        if (validResults.length === 0) {
+            document.getElementById('featureInfo').innerHTML = '<p class="text-muted text-center mb-0">No feature information found at this location</p>';
+            return;
+        }
+
+        let featureInfoHtml = '';
+        validResults.forEach(result => {
+            featureInfoHtml += `<h6>${result.layer}</h6>`;
+
+            result.features.forEach((feature, index) => {
+                featureInfoHtml += `<div class="mb-3"><strong>Feature ${index + 1}:</strong><table class="table table-sm table-bordered">`;
+
+                for (const key in feature.properties) {
+                    if (feature.properties.hasOwnProperty(key)) {
+                        featureInfoHtml += `<tr><td>${key}</td><td>${feature.properties[key]}</td></tr>`;
+                    }
+                }
+
+                featureInfoHtml += '</table></div>';
+            });
+        });
+
+        if (featureInfoHtml) {
+            content.innerHTML = featureInfoHtml;
+            overlay.setPosition(evt.coordinate);
+        } else {
+            overlay.setPosition(undefined);
+        }
+    });
+});
