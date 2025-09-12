@@ -1,431 +1,523 @@
-    // Initialize map
-    const map = new ol.Map({
-        target: 'map',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.OSM(),
-                visible: true,
-                name: 'OpenStreetMap'
+// Initialize map
+const map = new ol.Map({
+    target: 'map',
+    layers: [
+        new ol.layer.Tile({
+            source: new ol.source.OSM(),
+            visible: true,
+            name: 'OpenStreetMap',
+            title: 'OpenStreetMap'
+        }),
+        new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attributions: '© Esri'
             }),
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    attributions: '© Esri'
-                }),
-                visible: false,
-                name: 'Satellite'
+            visible: false,
+            name: 'Satellite',
+            title: 'Satellite'
+        }),
+        new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
+                attributions: '© Esri'
             }),
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',
-                    attributions: '© Esri'
-                }),
-                visible: false,
-                name: 'Terrain'
-            })
-        ],
-        view: new ol.View({
-            center: ol.proj.fromLonLat([80.1514, 17.2473]),
-            zoom: 5
+            visible: false,
+            name: 'Terrain',
+            title: 'Terrain'
         })
-    });
-    // Create popup overlay
-    const container = document.getElementById('popup');
-    const content = document.getElementById('popup-content');
-    const closer = document.getElementById('popup-closer');
+    ],
+    view: new ol.View({
+        center: ol.proj.fromLonLat([80.1514, 17.2473]),
+        zoom: 5
+    })
+});
 
-    const overlay = new ol.Overlay({
-        element: container,
-        autoPan: {
-            animation: {
-                duration: 250,
-            },
+// Create popup overlay
+const container = document.getElementById('popup');
+const content = document.getElementById('popup-content');
+const closer = document.getElementById('popup-closer');
+
+const overlay = new ol.Overlay({
+    element: container,
+    autoPan: {
+        animation: {
+            duration: 250,
         },
+    },
+});
+map.addOverlay(overlay);
+
+// Close popup
+closer.onclick = function () {
+    overlay.setPosition(undefined);
+    closer.blur();
+    return false;
+};
+
+// Store active WMS layers
+const activeLayers = [];
+
+// Store the parsed XML document globally
+let capabilitiesXmlDoc = null;
+
+// Store DataTable instance
+let layersDataTable = null;
+
+// Store the current server URL
+let currentServerUrl = '';
+
+// Initialize UI components
+function initUI() {
+    // Mobile panel toggle
+    const leftPanel = document.getElementById('leftPanel');
+    const leftPanelToggle = document.getElementById('leftPanelToggle');
+    const closeLeftPanel = document.getElementById('closeLeftPanel');
+    const overlay = document.getElementById('overlay');
+
+    
+    leftPanelToggle.addEventListener('click', function() {
+        leftPanel.classList.add('active');
+        overlay.classList.add('active');
+        
     });
-    map.addOverlay(overlay);
-
-    // Close popup
-    closer.onclick = function () {
-        overlay.setPosition(undefined);
-        closer.blur();
-        return false;
-    };
-
-    // Store active WMS layers
-    const activeLayers = [];
-
-    // Store the parsed XML document globally
-    let capabilitiesXmlDoc = null;
-
-    // Store DataTable instance
-    let layersDataTable = null;
-
-    // Store the current server URL
-    let currentServerUrl = '';
-
-    // Base layer switcher
+    
+    closeLeftPanel.addEventListener('click', function() {
+        leftPanel.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+    
+    overlay.addEventListener('click', function() {
+        leftPanel.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+    
+    // Base layer switching
     document.querySelectorAll('input[name="baseLayer"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            const layers = map.getLayers();
-            layers.forEach((layer, index) => {
-                if (index < 3) { // First three layers are base layers
-                    layer.setVisible(false);
-                }
-            });
-
-            if (radio.id === 'osmLayer') {
-                layers.item(0).setVisible(true);
-            } else if (radio.id === 'satelliteLayer') {
-                layers.item(1).setVisible(true);
-            } else if (radio.id === 'terrainLayer') {
-                layers.item(2).setVisible(true);
-            }
+        radio.addEventListener('change', function() {
+            switchBaseLayer(this.id);
         });
     });
+    
+    // Fetch layers button
+    document.getElementById('fetchLayersBtn').addEventListener('click', fetchLayers);
+    
+    // Server selection change
+    document.getElementById('serverSelect').addEventListener('change', function() {
+        // Clear previous layers when server changes
+        document.getElementById('layersTableBody').innerHTML = 
+            '<tr><td colspan="3" class="text-center py-4">Select a server and click "Fetch Available Layers"</td></tr>';
+        document.getElementById('layerCount').textContent = '0';
+        
+        if (layersDataTable) {
+            layersDataTable.destroy();
+            layersDataTable = null;
+        }
+    });
+}
 
-    // Fetch layers from GetCapabilities
-    document.getElementById('fetchLayersBtn').addEventListener('click', function () {
-        currentServerUrl = document.getElementById('serverSelect').value;
-        const capabilitiesUrl = `${currentServerUrl}?service=WMS&request=GetCapabilities&version=1.3.0`;
+// Switch base layer
+function switchBaseLayer(layerId) {
+    const layers = map.getLayers();
+    layers.forEach((layer, index) => {
+        if (index < 3) { // First three layers are base layers
+            layer.setVisible(false);
+        }
+    });
 
-        // Show loading indicator
-        document.getElementById('loading').style.display = 'block';
-        // Clear previous results
-        document.getElementById('layersTableBody').innerHTML = '';
-        const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
+    if (layerId === 'osmLayer') {
+        layers.item(0).setVisible(true);
+    } else if (layerId === 'satelliteLayer') {
+        layers.item(1).setVisible(true);
+    } else if (layerId === 'terrainLayer') {
+        layers.item(2).setVisible(true);
+    }
+}
 
-        fetch(proxyUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-                }
-                return response.text();
-            })
-            .then(xmlText => {
-                // Hide loading indicator
-                document.getElementById('loading').style.display = 'none';
+// Fetch layers from GetCapabilities
+function fetchLayers() {
+    currentServerUrl = document.getElementById('serverSelect').value;
+    const capabilitiesUrl = `${currentServerUrl}?service=WMS&request=GetCapabilities&version=1.3.0`;
 
-                // Parse XML
-                const parser = new DOMParser();
-                capabilitiesXmlDoc = parser.parseFromString(xmlText, "text/xml");
+    // Show loading indicator
+    document.getElementById('loading').style.display = 'flex';
+    // Clear previous results
+    document.getElementById('layersTableBody').innerHTML = '';
+    const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
 
-                // Check for XML errors
-                const parseError = capabilitiesXmlDoc.getElementsByTagName("parsererror");
-                if (parseError.length > 0) {
-                    throw new Error("Failed to parse XML response");
-                }
+    fetch(proxyUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(xmlText => {
+            // Hide loading indicator
+            document.getElementById('loading').style.display = 'none';
 
-                // Extract server info
-                const service = capabilitiesXmlDoc.getElementsByTagName('Service')[0];
-                if (!service) {
-                    throw new Error("No Service information found in response");
-                }
+            // Parse XML
+            const parser = new DOMParser();
+            capabilitiesXmlDoc = parser.parseFromString(xmlText, "text/xml");
 
-                const serviceTitle = service.getElementsByTagName('Title')[0]?.textContent || 'Unknown Service';
-                const serviceAbstract = service.getElementsByTagName('Abstract')[0]?.textContent || 'No description available';
+            // Check for XML errors
+            const parseError = capabilitiesXmlDoc.getElementsByTagName("parsererror");
+            if (parseError.length > 0) {
+                throw new Error("Failed to parse XML response");
+            }
 
+            // Extract server info
+            const service = capabilitiesXmlDoc.getElementsByTagName('Service')[0];
+            if (!service) {
+                throw new Error("No Service information found in response");
+            }
 
-                // Extract layers
-                const layerElements = capabilitiesXmlDoc.getElementsByTagName("Layer");
-                const layersTableBody = document.getElementById('layersTableBody');
-                layersTableBody.innerHTML = ''; // Clear previous results
+            const serviceTitle = service.getElementsByTagName('Title')[0]?.textContent || 'Unknown Service';
+            const serviceAbstract = service.getElementsByTagName('Abstract')[0]?.textContent || 'No description available';
 
-                let layerCount = 0;
+            // Extract layers
+            const layerElements = capabilitiesXmlDoc.getElementsByTagName("Layer");
+            const layersTableBody = document.getElementById('layersTableBody');
+            layersTableBody.innerHTML = ''; // Clear previous results
 
-                for (let i = 0; i < layerElements.length; i++) {
-                    const nameElem = layerElements[i].getElementsByTagName("Name")[0];
-                    const titleElem = layerElements[i].getElementsByTagName("Title")[0];
+            let layerCount = 0;
 
-                    if (nameElem && titleElem) {
-                        const layerName = nameElem.textContent;
-                        const layerTitle = titleElem.textContent;
+            for (let i = 0; i < layerElements.length; i++) {
+                const nameElem = layerElements[i].getElementsByTagName("Name")[0];
+                const titleElem = layerElements[i].getElementsByTagName("Title")[0];
 
-                        // Skip the root layer which often has the service title
-                        if (layerTitle === serviceTitle) continue;
+                if (nameElem && titleElem) {
+                    const layerName = nameElem.textContent;
+                    const layerTitle = titleElem.textContent;
 
-                        const row = layersTableBody.insertRow();
-                        const cellTitle = row.insertCell(0);
-                        const cellActions = row.insertCell(1);
+                    // Skip the root layer which often has the service title
+                    if (layerTitle === serviceTitle) continue;
 
-                        cellTitle.textContent = layerTitle;
+                    const row = layersTableBody.insertRow();
+                    row.className = 'layer-row';
+                    row.setAttribute('data-layer-name', layerName);
+                    
+                    const cellTitle = row.insertCell(0);
+                    const cellStatus = row.insertCell(1);
+                    const cellActions = row.insertCell(2);
 
-                        // Add action buttons
-                        cellActions.innerHTML = `
-                            <button class="btn btn-sm btn-outline-primary btn-action zoom-layer" data-layer="${layerName}" title="Zoom to Layer">
+                    cellTitle.textContent = layerTitle;
+                    cellTitle.className = 'layer-title';
+
+                    // Status cell
+                    cellStatus.innerHTML = '<span class="badge bg-secondary status-badge">Not Added</span>';
+                    cellStatus.className = 'text-center';
+
+                    // Add action buttons
+                    cellActions.innerHTML = `
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary zoom-layer" data-layer="${layerName}" title="Zoom to Layer">
                                 <i class="bi bi-zoom-in"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-success btn-action add-layer" 
+                            <button class="btn btn-outline-success toggle-layer" 
                                     data-layer="${layerName}" 
                                     data-title="${layerTitle}"
-                                    title="Add Layer to Map">
-                                <i class="bi bi-plus-circle"></i>
+                                    title="Toggle Layer Visibility">
+                                <i class="bi bi-eye"></i>
                             </button>
-                        `;
-
-                        layerCount++;
-                    }
-                }
-
-                document.getElementById('layerCount').textContent = layerCount;
-
-                if (layerCount === 0) {
-                    layersTableBody.innerHTML = `
-                        <tr>
-                            <td colspan="2" class="text-center py-4">
-                                No layers found in the GetCapabilities response
-                            </td>
-                        </tr>
+                            <button class="btn btn-outline-info info-layer" data-layer="${layerName}" title="Layer Info">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
                     `;
+
+                    layerCount++;
                 }
+            }
 
-                // Initialize or reinitialize DataTable
-                if (layersDataTable) {
-                    layersDataTable.destroy();
-                }
+            document.getElementById('layerCount').textContent = layerCount;
 
-                layersDataTable = $('#layersTable').DataTable({
-                    pageLength: 5,
-                    lengthMenu: [5, 10, 25, 50],
-                    ordering: true,
-                    searching: true,
-                    responsive: true,
-                    autoWidth: false,
-                    columns: [
-                        { title: "Title" },
-                        { title: "Actions", orderable: false, searchable: false }
-                    ]
-                });
-
-                // Use event delegation for dynamically created elements
-                $('#layersTableBody').on('click', '.zoom-layer', function () {
-                    const layerName = $(this).data('layer');
-                    zoomToLayer(layerName);
-                });
-
-                $('#layersTableBody').on('click', '.add-layer', function () {
-                    const layerName = $(this).data('layer');
-                    const layerTitle = $(this).data('title');
-                    addWmsLayer(currentServerUrl, layerName, layerTitle);
-                });
-            })
-            .catch(error => {
-                document.getElementById('loading').style.display = 'none';
-                console.error('Error fetching GetCapabilities:', error);
-
-                document.getElementById('layersTableBody').innerHTML = `
+            if (layerCount === 0) {
+                layersTableBody.innerHTML = `
                     <tr>
-                        <td colspan="2" class="text-center py-4 text-danger">
-                            Error: ${error.message}
+                        <td colspan="3" class="text-center py-4">
+                            No layers found in the GetCapabilities response
                         </td>
                     </tr>
                 `;
-            });
-    });
-
-    // Function to zoom to a specific layer's extent
-    function zoomToLayer(layerName) {
-        if (!capabilitiesXmlDoc) {
-            alert('No capabilities data available. Please fetch layers first.');
-            return;
-        }
-
-        // Find the layer element in the XML
-        const layerElements = capabilitiesXmlDoc.getElementsByTagName("Layer");
-        let targetLayer = null;
-
-        for (let i = 0; i < layerElements.length; i++) {
-            const nameElem = layerElements[i].getElementsByTagName("Name")[0];
-            if (nameElem && nameElem.textContent === layerName) {
-                targetLayer = layerElements[i];
-                break;
             }
-        }
 
-        if (!targetLayer) {
-            alert('Layer information not found');
-            return;
-        }
-
-        // Try to get bounding box in CRS:84 (standard lon/lat)
-        let bboxElem = targetLayer.getElementsByTagName("BoundingBox")[0];
-        if (!bboxElem) {
-            alert('No bounding box information available for this layer');
-            return;
-        }
-
-        // Check if we have a CRS:84 bounding box
-        let crs84Bbox = null;
-        for (let i = 0; i < targetLayer.getElementsByTagName("BoundingBox").length; i++) {
-            const bbox = targetLayer.getElementsByTagName("BoundingBox")[i];
-            if (bbox.getAttribute('CRS') === 'CRS:84') {
-                crs84Bbox = bbox;
-                break;
+            // Initialize or reinitialize DataTable
+            if (layersDataTable) {
+                layersDataTable.destroy();
             }
-        }
 
-        // If no CRS:84, use the first available bounding box
-        if (!crs84Bbox) {
-            crs84Bbox = bboxElem;
-        }
-
-        const minx = parseFloat(crs84Bbox.getAttribute('minx'));
-        const miny = parseFloat(crs84Bbox.getAttribute('miny'));
-        const maxx = parseFloat(crs84Bbox.getAttribute('maxx'));
-        const maxy = parseFloat(crs84Bbox.getAttribute('maxy'));
-
-        // Convert to map projection (assuming map is using EPSG:3857)
-        const bottomLeft = ol.proj.fromLonLat([minx, miny]);
-        const topRight = ol.proj.fromLonLat([maxx, maxy]);
-
-        // Calculate extent
-        const extent = [
-            bottomLeft[0],
-            bottomLeft[1],
-            topRight[0],
-            topRight[1]
-        ];
-
-        // Zoom to extent with padding
-        map.getView().fit(extent, {
-            padding: [50, 50, 50, 50], // Add some padding
-            duration: 1000 // Animation duration in ms
-        });
-    }
-
-    // Function to add WMS layer to map
-    function addWmsLayer(serverUrl, layerName, layerTitle) {
-        // Check if layer is already added
-        if (activeLayers.some(layer => layer.get('name') === layerName)) {
-            alert('Layer is already added to the map');
-            return;
-        }
-
-        // Show loading indicator
-        document.getElementById('mapLoader').style.display = 'flex';
-
-        // Create WMS layer
-        const wmsLayer = new ol.layer.Tile({
-            source: new ol.source.TileWMS({
-                url: serverUrl,
-                params: {
-                    'LAYERS': layerName,
-                    'TILED': true
-                },
-                serverType: 'geoserver',
-                transition: 0
-            }),
-            visible: true,
-            name: layerName,
-            title: layerTitle
-        });
-
-        // Add layer to map
-        map.addLayer(wmsLayer);
-        activeLayers.push(wmsLayer);
-
-        // Hide loading indicator when layer is loaded
-        wmsLayer.getSource().on('tileloadend', function () {
-            document.getElementById('mapLoader').style.display = 'none';
-        });
-
-        // Also hide loader after a timeout as a fallback
-        setTimeout(() => {
-            document.getElementById('mapLoader').style.display = 'none';
-        }, 5000);
-
-        // Update active layers list
-        updateActiveLayersList();
-
-        // Update legend
-        updateLegend(serverUrl, layerName);
-    }
-
-    // Function to update active layers list with zoom buttons
-    function updateActiveLayersList() {
-        const activeLayersList = document.getElementById('activeLayersList');
-        activeLayersList.innerHTML = '';
-
-        if (activeLayers.length === 0) {
-            activeLayersList.innerHTML = '<li class="list-group-item text-center py-4">No active layers</li>';
-            document.getElementById('activeLayerCount').textContent = '0';
-            return;
-        }
-
-        document.getElementById('activeLayerCount').textContent = activeLayers.length;
-
-        activeLayers.forEach((layer, index) => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item active-layer-item';
-            li.innerHTML = `
-                <div>
-                    <strong>${layer.get('title')}</strong>
-                    <br>
-                    <small class="text-muted">${layer.get('name')}</small>
-                </div>
-                <div>
-                    <button class="btn btn-sm btn-outline-info toggle-layer" data-index="${index}" title="Toggle Visibility">
-                        <i class="bi ${layer.getVisible() ? 'bi-eye' : 'bi-eye-slash'}"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-primary zoom-active-layer" data-layer="${layer.get('name')}" title="Zoom to Layer">
-                        <i class="bi bi-zoom-in"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger remove-layer" data-index="${index}" title="Remove Layer">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            `;
-            activeLayersList.appendChild(li);
-        });
-
-        // Add event listeners for toggle, zoom and remove buttons
-        document.querySelectorAll('.toggle-layer').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const index = parseInt(this.getAttribute('data-index'));
-                const layer = activeLayers[index];
-                layer.setVisible(!layer.getVisible());
-
-                // Update button icon
-                const icon = this.querySelector('i');
-                icon.className = layer.getVisible() ? 'bi bi-eye' : 'bi bi-eye-slash';
-                this.classList.toggle('btn-outline-secondary', !layer.getVisible());
-            });
-        });
-
-        // Add event listeners for zoom buttons in active layers
-        document.querySelectorAll('.zoom-active-layer').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const layerName = this.getAttribute('data-layer');
-                zoomToLayer(layerName);
-            });
-        });
-
-        document.querySelectorAll('.remove-layer').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const index = parseInt(this.getAttribute('data-index'));
-                const layer = activeLayers[index];
-                map.removeLayer(layer);
-                activeLayers.splice(index, 1);
-                updateActiveLayersList();
-
-                // Clear legend if no layers are active
-                if (activeLayers.length === 0) {
-                    document.getElementById('legend').innerHTML = '<p class="text-muted text-center mb-0">No active layer selected</p>';
+            layersDataTable = $('#layersTable').DataTable({
+                pageLength: 5,
+                lengthMenu: [5, 10, 25, 50],
+                ordering: true,
+                searching: true,
+                responsive: true,
+                autoWidth: false,
+                columns: [
+                    { title: "Title" },
+                    { title: "Status", width: "100px", className: "text-center" },
+                    { title: "Actions", orderable: false, searchable: false, width: "160px" }
+                ],
+                language: {
+                    search: "Filter layers:",
+                    lengthMenu: "Show _MENU_ layers",
+                    info: "Showing _START_ to _END_ of _TOTAL_ layers",
+                    infoEmpty: "No layers available",
+                    infoFiltered: "(filtered from _MAX_ total layers)"
                 }
             });
+
+            // Use event delegation for dynamically created elements
+            $('#layersTableBody').on('click', '.zoom-layer', function () {
+                const layerName = $(this).data('layer');
+                zoomToLayer(layerName);
+            });
+
+            $('#layersTableBody').on('click', '.toggle-layer', function () {
+                const layerName = $(this).data('layer');
+                const layerTitle = $(this).data('title');
+                const row = $(this).closest('tr');
+                
+                // Check if layer is already added
+                const layerIndex = activeLayers.findIndex(layer => layer.get('name') === layerName);
+                
+                if (layerIndex === -1) {
+                    // Layer not added yet, add it
+                    addWmsLayer(currentServerUrl, layerName, layerTitle, row);
+                } else {
+                    // Layer already added, toggle visibility
+                    const layer = activeLayers[layerIndex];
+                    const isVisible = layer.getVisible();
+                    layer.setVisible(!isVisible);
+                    
+                    // Update button appearance
+                    const icon = $(this).find('i');
+                    if (!isVisible) {
+                        icon.removeClass('bi-eye').addClass('bi-eye-slash');
+                        row.find('.status-badge').removeClass('bg-success').addClass('bg-secondary').text('Hidden');
+                    } else {
+                        icon.removeClass('bi-eye-slash').addClass('bi-eye');
+                        row.find('.status-badge').removeClass('bg-secondary').addClass('bg-success').text('Visible');
+                    }
+                    
+                    // Update row styling
+                    row.toggleClass('table-active', !isVisible);
+                }
+            });
+
+            $('#layersTableBody').on('click', '.info-layer', function () {
+                const layerName = $(this).data('layer');
+                showLayerInfo(layerName);
+            });
+            
+            // Show layers panel on mobile after fetching
+            if (window.innerWidth <= 991.98) {
+                document.getElementById('leftPanel').classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+            }
+        })
+        .catch(error => {
+            document.getElementById('loading').style.display = 'none';
+            console.error('Error fetching GetCapabilities:', error);
+
+            document.getElementById('layersTableBody').innerHTML = `
+                <tr>
+                    <td colspan="3" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Error: ${error.message}
+                    </td>
+                </tr>
+            `;
         });
+}
+
+// Function to show layer information
+function showLayerInfo(layerName) {
+    if (!capabilitiesXmlDoc) {
+        alert('No capabilities data available. Please fetch layers first.');
+        return;
     }
 
+    // Find the layer element in the XML
+    const layerElements = capabilitiesXmlDoc.getElementsByTagName("Layer");
+    let targetLayer = null;
 
-    // Update legend for a layer
-    function updateLegend(serverUrl, layerName) {
-        const legendUrl = `${serverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${layerName}`;
-        document.getElementById('legend').innerHTML = `
-            <strong>Legend for ${layerName}:</strong><br>
-            <img src="${legendUrl}" alt="${layerName} Legend" style="max-width: 100%">
-        `;
+    for (let i = 0; i < layerElements.length; i++) {
+        const nameElem = layerElements[i].getElementsByTagName("Name")[0];
+        if (nameElem && nameElem.textContent === layerName) {
+            targetLayer = layerElements[i];
+            break;
+        }
     }
 
-    // Feature info on map click
+    if (!targetLayer) {
+        alert('Layer information not found');
+        return;
+    }
+
+    // Extract layer information
+    const titleElem = targetLayer.getElementsByTagName("Title")[0];
+    const abstractElem = targetLayer.getElementsByTagName("Abstract")[0];
+    const bboxElem = targetLayer.getElementsByTagName("BoundingBox")[0];
+
+    const title = titleElem ? titleElem.textContent : 'No title available';
+    const abstract = abstractElem ? abstractElem.textContent : 'No description available';
+    let bboxInfo = 'No bounding box information';
+
+    if (bboxElem) {
+        const minx = bboxElem.getAttribute('minx');
+        const miny = bboxElem.getAttribute('miny');
+        const maxx = bboxElem.getAttribute('maxx');
+        const maxy = bboxElem.getAttribute('maxy');
+        const crs = bboxElem.getAttribute('CRS') || bboxElem.getAttribute('crs') || 'Unknown CRS';
+        
+        bboxInfo = `CRS: ${crs}, BBOX: [${minx}, ${miny}, ${maxx}, ${maxy}]`;
+    }
+
+    // Show in a modal or alert
+    alert(`Layer Information:\n\nTitle: ${title}\n\nDescription: ${abstract}\n\n${bboxInfo}`);
+}
+
+// Function to zoom to a specific layer's extent
+function zoomToLayer(layerName) {
+    if (!capabilitiesXmlDoc) {
+        alert('No capabilities data available. Please fetch layers first.');
+        return;
+    }
+
+    // Find the layer element in the XML
+    const layerElements = capabilitiesXmlDoc.getElementsByTagName("Layer");
+    let targetLayer = null;
+
+    for (let i = 0; i < layerElements.length; i++) {
+        const nameElem = layerElements[i].getElementsByTagName("Name")[0];
+        if (nameElem && nameElem.textContent === layerName) {
+            targetLayer = layerElements[i];
+            break;
+        }
+    }
+
+    if (!targetLayer) {
+        alert('Layer information not found');
+        return;
+    }
+
+    // Try to get bounding box in CRS:84 (standard lon/lat)
+    let bboxElem = targetLayer.getElementsByTagName("BoundingBox")[0];
+    if (!bboxElem) {
+        alert('No bounding box information available for this layer');
+        return;
+    }
+
+    // Check if we have a CRS:84 bounding box
+    let crs84Bbox = null;
+    for (let i = 0; i < targetLayer.getElementsByTagName("BoundingBox").length; i++) {
+        const bbox = targetLayer.getElementsByTagName("BoundingBox")[i];
+        if (bbox.getAttribute('CRS') === 'CRS:84') {
+            crs84Bbox = bbox;
+            break;
+        }
+    }
+
+    // If no CRS:84, use the first available bounding box
+    if (!crs84Bbox) {
+        crs84Bbox = bboxElem;
+    }
+
+    const minx = parseFloat(crs84Bbox.getAttribute('minx'));
+    const miny = parseFloat(crs84Bbox.getAttribute('miny'));
+    const maxx = parseFloat(crs84Bbox.getAttribute('maxx'));
+    const maxy = parseFloat(crs84Bbox.getAttribute('maxy'));
+
+    // Convert to map projection (assuming map is using EPSG:3857)
+    const bottomLeft = ol.proj.fromLonLat([minx, miny]);
+    const topRight = ol.proj.fromLonLat([maxx, maxy]);
+
+    // Calculate extent
+    const extent = [
+        bottomLeft[0],
+        bottomLeft[1],
+        topRight[0],
+        topRight[1]
+    ];
+
+    // Zoom to extent with padding
+    map.getView().fit(extent, {
+        padding: [50, 50, 50, 50], // Add some padding
+        duration: 1000 // Animation duration in ms
+    });
+    
+    // Switch to map view on mobile after zooming
+    if (window.innerWidth <= 991.98) {
+        document.getElementById('leftPanel').classList.remove('active');
+        document.getElementById('overlay').classList.remove('active');
+    }
+}
+
+// Function to add WMS layer to map
+function addWmsLayer(serverUrl, layerName, layerTitle, row) {
+    // Show loading indicator
+    document.getElementById('mapLoader').style.display = 'flex';
+
+    // Create WMS layer
+    const wmsLayer = new ol.layer.Tile({
+        source: new ol.source.TileWMS({
+            url: serverUrl,
+            params: {
+                'LAYERS': layerName,
+                'TILED': true
+            },
+            serverType: 'geoserver',
+            transition: 0
+        }),
+        visible: true,
+        name: layerName,
+        title: layerTitle
+    });
+
+    // Add layer to map
+    map.addLayer(wmsLayer);
+    activeLayers.push(wmsLayer);
+
+    // Hide loading indicator when layer is loaded
+    wmsLayer.getSource().on('tileloadend', function () {
+        document.getElementById('mapLoader').style.display = 'none';
+    });
+
+    // Also hide loader after a timeout as a fallback
+    setTimeout(() => {
+        document.getElementById('mapLoader').style.display = 'none';
+    }, 5000);
+
+    // Update the row status
+    row.find('.status-badge').removeClass('bg-secondary').addClass('bg-success').text('Visible');
+    row.addClass('table-active');
+    
+    // Update the button icon
+    row.find('.toggle-layer i').removeClass('bi-eye').addClass('bi-eye-slash');
+
+    // Update legend
+    updateLegend(serverUrl, layerName, layerTitle);
+    
+    // Show map view on mobile after adding layer
+    if (window.innerWidth <= 991.98) {
+        document.getElementById('leftPanel').classList.remove('active');
+        document.getElementById('overlay').classList.remove('active');
+    }
+}
+
+// Update legend for a layer
+function updateLegend(serverUrl, layerName, layerTitle) {
+    const legendUrl = `${serverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${layerName}`;
+    document.getElementById('legend').innerHTML = `
+        <h6 class="mb-2">${layerTitle}</h6>
+        <div class="text-center">
+            <img src="${legendUrl}" alt="${layerName} Legend" class="img-fluid" onerror="this.style.display='none'">
+        </div>
+        <div class="mt-2 small text-muted text-center">Legend for ${layerName}</div>
+    `;
+}
+
 // Feature info on map click
 map.on('singleclick', function (evt) {
     const view = map.getView();
@@ -480,20 +572,21 @@ map.on('singleclick', function (evt) {
         const validResults = results.filter(result => result !== null);
 
         if (validResults.length === 0) {
-            document.getElementById('featureInfo').innerHTML = '<p class="text-muted text-center mb-0">No feature information found at this location</p>';
+            content.innerHTML = '<p class="text-muted text-center mb-0">No feature information found at this location</p>';
+            overlay.setPosition(evt.coordinate);
             return;
         }
 
         let featureInfoHtml = '';
         validResults.forEach(result => {
-            featureInfoHtml += `<h6>${result.layer}</h6>`;
+            featureInfoHtml += `<h6 class="border-bottom pb-2 mb-2">${result.layer}</h6>`;
 
             result.features.forEach((feature, index) => {
-                featureInfoHtml += `<div class="mb-3"><strong>Feature ${index + 1}:</strong><table class="table table-sm table-bordered">`;
+                featureInfoHtml += `<div class="mb-3"><strong>Feature ${index + 1}:</strong><table class="table table-sm table-bordered mt-1">`;
 
                 for (const key in feature.properties) {
                     if (feature.properties.hasOwnProperty(key)) {
-                        featureInfoHtml += `<tr><td>${key}</td><td>${feature.properties[key]}</td></tr>`;
+                        featureInfoHtml += `<tr><td class="fw-bold">${key}</td><td>${feature.properties[key] || 'N/A'}</td></tr>`;
                     }
                 }
 
@@ -508,4 +601,9 @@ map.on('singleclick', function (evt) {
             overlay.setPosition(undefined);
         }
     });
+});
+
+// Initialize the UI when the document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initUI();
 });
