@@ -75,40 +75,40 @@ function initUI() {
     const closeLeftPanel = document.getElementById('closeLeftPanel');
     const overlay = document.getElementById('overlay');
 
-    
-    leftPanelToggle.addEventListener('click', function() {
+
+    leftPanelToggle.addEventListener('click', function () {
         leftPanel.classList.add('active');
         overlay.classList.add('active');
-        
+
     });
-    
-    closeLeftPanel.addEventListener('click', function() {
+
+    closeLeftPanel.addEventListener('click', function () {
         leftPanel.classList.remove('active');
         overlay.classList.remove('active');
     });
-    
-    overlay.addEventListener('click', function() {
+
+    overlay.addEventListener('click', function () {
         leftPanel.classList.remove('active');
         overlay.classList.remove('active');
     });
-    
+
     // Base layer switching
     document.querySelectorAll('input[name="baseLayer"]').forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function () {
             switchBaseLayer(this.id);
         });
     });
-    
+
     // Fetch layers button
     document.getElementById('fetchLayersBtn').addEventListener('click', fetchLayers);
-    
+
     // Server selection change
-    document.getElementById('serverSelect').addEventListener('change', function() {
+    document.getElementById('serverSelect').addEventListener('change', function () {
         // Clear previous layers when server changes
-        document.getElementById('layersTableBody').innerHTML = 
+        document.getElementById('layersTableBody').innerHTML =
             '<tr><td colspan="3" class="text-center py-4">Select a server and click "Fetch Available Layers"</td></tr>';
         document.getElementById('layerCount').textContent = '0';
-        
+
         if (layersDataTable) {
             layersDataTable.destroy();
             layersDataTable = null;
@@ -134,7 +134,8 @@ function switchBaseLayer(layerId) {
     }
 }
 
-// Fetch layers from GetCapabilities
+
+// // Fetch layers from GetCapabilities
 function fetchLayers() {
     currentServerUrl = document.getElementById('serverSelect').value;
     const capabilitiesUrl = `${currentServerUrl}?service=WMS&request=GetCapabilities&version=1.3.0`;
@@ -143,7 +144,7 @@ function fetchLayers() {
     document.getElementById('loading').style.display = 'flex';
     // Clear previous results
     document.getElementById('layersTableBody').innerHTML = '';
-    const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
+    const proxyUrl = "http://127.0.0.1:8000/proxy/getcapabilities?url=" + encodeURIComponent(currentServerUrl);
 
     fetch(proxyUrl)
         .then(response => {
@@ -196,7 +197,7 @@ function fetchLayers() {
                     const row = layersTableBody.insertRow();
                     row.className = 'layer-row';
                     row.setAttribute('data-layer-name', layerName);
-                    
+
                     const cellTitle = row.insertCell(0);
                     const cellStatus = row.insertCell(1);
                     const cellActions = row.insertCell(2);
@@ -278,10 +279,10 @@ function fetchLayers() {
                 const layerName = $(this).data('layer');
                 const layerTitle = $(this).data('title');
                 const row = $(this).closest('tr');
-                
+
                 // Check if layer is already added
                 const layerIndex = activeLayers.findIndex(layer => layer.get('name') === layerName);
-                
+
                 if (layerIndex === -1) {
                     // Layer not added yet, add it
                     addWmsLayer(currentServerUrl, layerName, layerTitle, row);
@@ -290,7 +291,7 @@ function fetchLayers() {
                     const layer = activeLayers[layerIndex];
                     const isVisible = layer.getVisible();
                     layer.setVisible(!isVisible);
-                    
+
                     // Update button appearance
                     const icon = $(this).find('i');
                     if (!isVisible) {
@@ -300,7 +301,7 @@ function fetchLayers() {
                         icon.removeClass('bi-eye-slash').addClass('bi-eye');
                         row.find('.status-badge').removeClass('bg-secondary').addClass('bg-success').text('Visible');
                     }
-                    
+
                     // Update row styling
                     row.toggleClass('table-active', !isVisible);
                 }
@@ -310,7 +311,7 @@ function fetchLayers() {
                 const layerName = $(this).data('layer');
                 showLayerInfo(layerName);
             });
-            
+
             // Show layers panel on mobile after fetching
             if (window.innerWidth <= 991.98) {
                 document.getElementById('leftPanel').classList.add('active');
@@ -330,6 +331,41 @@ function fetchLayers() {
             `;
         });
 }
+
+document.getElementById('addServerBtn').addEventListener('click', function () {
+    const customUrlInput = document.getElementById('customServerUrl');
+    const url = customUrlInput.value.trim();
+
+    if (!url) {
+        alert('Please enter a valid WMS server URL.');
+        return;
+    }
+
+    const serverSelect = document.getElementById('serverSelect');
+
+    // Check if the URL already exists
+    for (let i = 0; i < serverSelect.options.length; i++) {
+        if (serverSelect.options[i].value === url) {
+            alert('This server is already added.');
+            return;
+        }
+    }
+
+    // Create new option dynamically
+    const option = document.createElement('option');
+    option.value = url;
+
+    // Label: "Local GeoServer" if localhost, otherwise show URL
+    option.textContent = url
+
+    serverSelect.appendChild(option);
+    serverSelect.value = url;  // Select the newly added server
+    customUrlInput.value = ''; // Clear input
+
+    // Automatically fetch layers for the new server
+    fetchLayers();
+});
+
 
 // Function to show layer information
 function showLayerInfo(layerName) {
@@ -370,7 +406,7 @@ function showLayerInfo(layerName) {
         const maxx = bboxElem.getAttribute('maxx');
         const maxy = bboxElem.getAttribute('maxy');
         const crs = bboxElem.getAttribute('CRS') || bboxElem.getAttribute('crs') || 'Unknown CRS';
-        
+
         bboxInfo = `CRS: ${crs}, BBOX: [${minx}, ${miny}, ${maxx}, ${maxy}]`;
     }
 
@@ -446,7 +482,7 @@ function zoomToLayer(layerName) {
         padding: [50, 50, 50, 50], // Add some padding
         duration: 1000 // Animation duration in ms
     });
-    
+
     // Switch to map view on mobile after zooming
     if (window.innerWidth <= 991.98) {
         document.getElementById('leftPanel').classList.remove('active');
@@ -492,13 +528,13 @@ function addWmsLayer(serverUrl, layerName, layerTitle, row) {
     // Update the row status
     row.find('.status-badge').removeClass('bg-secondary').addClass('bg-success').text('Visible');
     row.addClass('table-active');
-    
+
     // Update the button icon
     row.find('.toggle-layer i').removeClass('bi-eye').addClass('bi-eye-slash');
 
     // Update legend
     updateLegend(serverUrl, layerName, layerTitle);
-    
+
     // Show map view on mobile after adding layer
     if (window.innerWidth <= 991.98) {
         document.getElementById('leftPanel').classList.remove('active');
@@ -524,23 +560,23 @@ map.on('singleclick', function (evt) {
     const viewResolution = view.getResolution();
     const size = map.getSize();
     const projection = view.getProjection();
-    
+
     // Get the map extent (bounding box)
     const extent = view.calculateExtent(size);
-    
+
     // Check all active WMS layers for feature info
     const featureInfoPromises = activeLayers.map(layer => {
         if (!layer.getVisible()) return Promise.resolve(null);
 
         const source = layer.getSource();
         if (!source || !(source instanceof ol.source.TileWMS)) return Promise.resolve(null);
-        
+
         // Calculate pixel coordinates for the click
         const coordinate = evt.coordinate;
         const pixel = map.getPixelFromCoordinate(coordinate);
-        
+
         // Build the proxy URL
-        const proxyUrl = "https://vedas-wms-layer-explorer.onrender.com/proxy/getfeatureinfo?" +
+        const proxyUrl = "http://127.0.0.1:8000/proxy/getfeatureinfo?" +
             `url=${encodeURIComponent(currentServerUrl)}` +
             `&bbox=${extent.join(',')}` +
             `&width=${size[0]}` +
@@ -604,6 +640,6 @@ map.on('singleclick', function (evt) {
 });
 
 // Initialize the UI when the document is ready
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initUI();
 });
