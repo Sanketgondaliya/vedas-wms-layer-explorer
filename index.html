@@ -16,25 +16,27 @@
 <body>
     <div class="container-fluid">
         <div class="row">
-            <!-- Left Panel Toggle Button (Mobile Only) -->
-            <!-- <div class="d-lg-none mobile-toggle-container">
-                <button class="btn btn-primary mobile-toggle-btn" id="leftPanelToggle">
-                    
-                    <i class="bi bi-layers"></i>
-                </button>
-            </div> -->
-
             <!-- Left Panel -->
             <div class="col-lg-5 col-xl-4 left-panel" id="leftPanel">
                 <div class="card server-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        
+
                         <span><i class="bi bi-server"></i> WMS Server Selection</span>
                         <button class="btn btn-sm btn-outline-light d-lg-none" id="closeLeftPanel">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                     <div class="card-body">
+                        <div class="server-add mb-3">
+                            <label class="form-label fw-bold">Add Custom WMS Server:</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="customServerUrl"
+                                    placeholder="http://localhost:8080/geoserver/pcmc/wms">
+                                <button class="btn btn-outline-primary" id="addServerBtn" type="button">
+                                    <i class="bi bi-plus-lg"></i> Add
+                                </button>
+                            </div>
+                        </div>
                         <div class="server-select">
                             <label class="form-label fw-bold">Select WMS Server:</label>
                             <select class="form-select form-select-lg mb-3" id="serverSelect">
@@ -100,15 +102,17 @@
             </div>
 
             <!-- Right Panel -->
-            <div class="col-lg-7 col-xl-8 right-panel">
+            <div class="col-lg-7 col-xl-8 right-panel" >
                 <div class="card map-card">
                     <div class="card-header">
-                        
-                        <input type="checkbox" role="button" aria-label="Display the menu" class="menu mobile-toggle-btn mobile-toggle-container" id="leftPanelToggle">
+
+                        <input type="checkbox" role="button" aria-label="Display the menu"
+                            class="menu mobile-toggle-btn mobile-toggle-container" id="leftPanelToggle">
                         <i class="bi bi-map"></i> Map View
                     </div>
                     <div class="card-body position-relative">
                         <div id="map"></div>
+
                         <div class="overlay-loader" id="mapLoader" style="display: none;">
                             <div class="text-center">
                                 <div class="spinner-border text-primary" role="status">
@@ -132,6 +136,9 @@
                                 <label class="btn btn-outline-primary" for="terrainLayer">Terrain</label>
                             </div>
                         </div>
+                        <p class="credits">Designed and Maintained by <strong>Sanket Gondaliya</strong> and <strong>Narendra Makdiya</strong> 
+                            
+                        </p>
                     </div>
                     <!-- Popup -->
                     <div id="popup" class="ol-popup">
