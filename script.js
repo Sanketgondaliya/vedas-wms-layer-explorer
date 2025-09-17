@@ -608,8 +608,8 @@ map.on('singleclick', function (evt) {
         const validResults = results.filter(result => result !== null);
 
         if (validResults.length === 0) {
-            content.innerHTML = '<p class="text-muted text-center mb-0">No feature information found at this location</p>';
-            overlay.setPosition(evt.coordinate);
+            // ❌ Do nothing (don't show popup if no features found)
+            overlay.setPosition(undefined);
             return;
         }
 
@@ -630,6 +630,7 @@ map.on('singleclick', function (evt) {
             });
         });
 
+        // ✅ Only show popup if features exist
         if (featureInfoHtml) {
             content.innerHTML = featureInfoHtml;
             overlay.setPosition(evt.coordinate);
@@ -637,6 +638,7 @@ map.on('singleclick', function (evt) {
             overlay.setPosition(undefined);
         }
     });
+
 });
 
 // Initialize the UI when the document is ready
