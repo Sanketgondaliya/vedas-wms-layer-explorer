@@ -62,11 +62,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--secondary-color)
-  );
+  background: linear-gradient(135deg,
+      var(--primary-color),
+      var(--secondary-color));
   color: white;
   border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
   padding: 1rem 1.5rem;
@@ -101,8 +99,17 @@ body {
   z-index: 1000;
 }
 
-.right-panel {
+/* .right-panel {
   padding: 1rem;
+  background-color: #f5f7fb;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+} */
+
+/* Right Panel Full Height Map */
+.right-panel {
+  padding: 0; /* remove padding so map touches edges */
   background-color: #f5f7fb;
   height: 100vh;
   display: flex;
@@ -167,20 +174,16 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--secondary-color)
-  );
+  background: linear-gradient(135deg,
+      var(--primary-color),
+      var(--secondary-color));
   border: none;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(
-    135deg,
-    var(--secondary-color),
-    var(--primary-color)
-  );
+  background: linear-gradient(135deg,
+      var(--secondary-color),
+      var(--primary-color));
   transform: translateY(-2px);
 }
 
@@ -207,22 +210,32 @@ body {
   position: relative;
 }
 
+.credits {
+  font-size: 0.9rem;
+  color: #555;
+  text-align: right;
+  margin-top: 10px;
+  margin-right: 10px;
+}
+
 .map-card {
-  height: 100%;
+  flex: 1; /* take all available height */
   display: flex;
   flex-direction: column;
+  margin: 0; /* remove margin if any */
 }
-
 .map-card .card-body {
-  flex: 1;
+  flex: 1; /* fill all remaining space in map-card */
   display: flex;
   flex-direction: column;
-  padding: 0;
-  position: relative;
+  padding: 0; /* remove padding to remove space */
+  height: 100%;
 }
 
-.map-card .card-body > div:first-child {
-  flex: 1;
+.map-card .card-body > #map {
+  flex: 1; /* map fills full card-body */
+  border-radius: 0; /* optional: remove rounded edges to occupy full area */
+  width: 100%;
 }
 
 /* Table Styling */
@@ -322,11 +335,9 @@ body {
 
 .ol-popup-header {
   padding: 1rem;
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--secondary-color)
-  );
+  background: linear-gradient(135deg,
+      var(--primary-color),
+      var(--secondary-color));
   color: white;
   border-radius: var(--border-radius) var(--border-radius) 0 0;
   display: flex;
@@ -385,6 +396,7 @@ body {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -420,11 +432,9 @@ body {
 }
 
 .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-  background: linear-gradient(
-    135deg,
-    var(--primary-color),
-    var(--secondary-color)
-  );
+  background: linear-gradient(135deg,
+      var(--primary-color),
+      var(--secondary-color));
   color: white !important;
   border: none;
 }
@@ -433,8 +443,10 @@ body {
 
 .menu {
   display: none;
-  --s: 20px; /* control the size */
-  --c: rgb(249, 245, 245); /* the color */
+  --s: 20px;
+  /* control the size */
+  --c: rgb(249, 245, 245);
+  /* the color */
 
   height: var(--s);
   aspect-ratio: 1;
@@ -442,10 +454,8 @@ body {
   padding: 0;
   border-inline: calc(var(--s) / 2) solid #0000;
   box-sizing: content-box;
-  --_g1: linear-gradient(var(--c) 20%, #0000 0 80%, var(--c) 0) no-repeat
-    content-box border-box;
-  --_g2: radial-gradient(circle closest-side at 50% 12.5%, var(--c) 95%, #0000)
-    repeat-y content-box border-box;
+  --_g1: linear-gradient(var(--c) 20%, #0000 0 80%, var(--c) 0) no-repeat content-box border-box;
+  --_g2: radial-gradient(circle closest-side at 50% 12.5%, var(--c) 95%, #0000) repeat-y content-box border-box;
   background: var(--_g2) left var(--_p, 0px) top,
     var(--_g1) left calc(var(--s) / 10 + var(--_p, 0px)) top,
     var(--_g2) right var(--_p, 0px) top,
@@ -461,6 +471,7 @@ body {
   -moz-appearance: none;
   appearance: none;
 }
+
 .menu:before,
 .menu:after {
   content: "";
@@ -484,8 +495,8 @@ body {
 
 /* Mobile Responsive Styles */
 @media (max-width: 991px) {
- 
-    /* .mobile-toggle-container {
+
+  /* .mobile-toggle-container {
     display: block;
   } */
 
@@ -493,7 +504,7 @@ body {
     display: block;
   }
 
-  
+
 
   .left-panel {
     position: fixed;
